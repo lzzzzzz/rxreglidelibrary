@@ -10,6 +10,15 @@ import java.io.File;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import io.reactivex.Flowable;
+import io.reactivex.Observable;
+import io.reactivex.ObservableSource;
+import io.reactivex.ObservableTransformer;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Consumer;
+import io.reactivex.functions.Function;
+import io.reactivex.schedulers.Schedulers;
 import okhttp3.Cache;
 import okhttp3.ConnectionPool;
 import okhttp3.OkHttpClient;
@@ -19,12 +28,9 @@ import okhttp3.logging.HttpLoggingInterceptor;
 import retrofit2.Retrofit;
 import retrofit2.adapter.rxjava.RxJavaCallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
-import rx.Observable;
+import rx.Observer;
 import rx.Subscriber;
-import rx.Subscription;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.functions.Func1;
-import rx.schedulers.Schedulers;
+import rx.functions.Action1;
 
 /**
  * RetrofitClient
@@ -188,56 +194,54 @@ public class RetrofitClient {
         return retrofit.create(service);
     }
 
-    public Subscription getData(Subscriber<IpResult> subscriber, String ip) {
+    public Disposable getData(Flowable<IpResult> subscriber, String ip) {
         return apiService.getData(ip)
                .compose(schedulersTransformer())
                 .compose(transformer())
-                .subscribe(subscriber);
+                .subscribe((Consumer) subscriber);
     }
 
-    public Subscription get(String url, Map parameters, Subscriber<IpResult> subscriber) {
+    public Disposable get(String url, Map parameters, Subscriber<IpResult> subscriber) {
 
         return apiService.executeGet(url, parameters)
                 .compose(schedulersTransformer())
                 .compose(transformer())
-                .subscribe(subscriber);
+                .subscribe((Consumer) subscriber);
     }
 
     public void post(String url, Map<String, String> parameters, Subscriber<ResponseBody> subscriber) {
         apiService.executePost(url, parameters)
                 .compose(schedulersTransformer())
                 .compose(transformer())
-                .subscribe(subscriber);
+                .subscribe((Consumer) subscriber);
     }
 
-    public Subscription json(String url, RequestBody jsonStr, Subscriber<IpResult> subscriber) {
+    public Disposable json(String url, RequestBody jsonStr, Flowable<IpResult> subscriber) {
 
         return apiService.json(url, jsonStr)
                 .compose(schedulersTransformer())
                 .compose(transformer())
-                .subscribe(subscriber);
+                .subscribe((Consumer) subscriber);
     }
 
-    public void upload(String url, RequestBody requestBody,Subscriber<ResponseBody> subscriber) {
+    public void upload(String url, RequestBody requestBody,Flowable<ResponseBody> subscriber) {
         apiService.upLoadFile(url, requestBody)
                 .compose(schedulersTransformer())
                 .compose(transformer())
-                .subscribe(subscriber);
+                .subscribe((Consumer) subscriber);
     }
 
     public void download(String url, final CallBack callBack) {
         apiService.downloadFile(url)
                 .compose(schedulersTransformer())
                 .compose(transformer())
-                .subscribe(new DownSubscriber<ResponseBody>(callBack));
+                .subscribe((Consumer)  new DownSubscriber<ResponseBody>(callBack));
     }
 
-    Observable.Transformer schedulersTransformer() {
-        return new Observable.Transformer() {
-
-
+    ObservableTransformer schedulersTransformer() {
+        return new ObservableTransformer() {
             @Override
-            public Object call(Object observable) {
+            public ObservableSource apply(Observable observable) {
                 return ((Observable)  observable).subscribeOn(Schedulers.io())
                         .unsubscribeOn(Schedulers.io())
                         .observeOn(AndroidSchedulers.mainThread());
@@ -252,16 +256,16 @@ public class RetrofitClient {
         };
     }
 
-    <T> Observable.Transformer<T, T> applySchedulers() {
-        return (Observable.Transformer<T, T>) schedulersTransformer();
+    <T> ObservableTransformer<T, T> applySchedulers() {
+        return (ObservableTransformer<T, T>) schedulersTransformer();
     }
 
-    public <T> Observable.Transformer<BaseResponse<T>, T> transformer() {
+    public <T> ObservableTransformer<BaseResponse<T>, T> transformer() {
 
-        return new Observable.Transformer() {
+        return new ObservableTransformer() {
 
             @Override
-            public Object call(Object observable) {
+            public ObservableSource apply(Observable observable) {
                 return ((Observable) observable).map(new HandleFuc<T>()).onErrorResumeNext(new HttpResponseFunc<T>());
             }
         };
@@ -273,15 +277,17 @@ public class RetrofitClient {
                 .observeOn(AndroidSchedulers.mainThread());
     }
 
-    private static class HttpResponseFunc<T> implements Func1<Throwable, Observable<T>> {
-        @Override public Observable<T> call(Throwable t) {
-            return Observable.error(ExceptionHandle.handleException(t));
+    private static class HttpResponseFunc<T> implements Function<Throwable, Observable<T>> {
+        @Override
+        public Observable<T> apply(Throwable throwable) throws Exception {
+            return Observable.error(ExceptionHandle.handleException(throwable));
         }
     }
 
-    private class HandleFuc<T> implements Func1<BaseResponse<T>, T> {
+    private class HandleFuc<T> implements Function<BaseResponse<T>, T> {
+
         @Override
-        public T call(BaseResponse<T> response) {
+        public T apply(BaseResponse<T> response) throws Exception {
             if (!response.isOk()) throw new RuntimeException(response.getCode() + "" + response.getMsg() != null ? response.getMsg(): "");
             return response.getData();
         }
@@ -304,7 +310,7 @@ public class RetrofitClient {
         observable.subscribeOn(Schedulers.io())
                 .unsubscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(subscriber);
+                .subscribe((Consumer<? super T>) subscriber);
 
         return null;
     }
