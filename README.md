@@ -19,3 +19,5 @@ if you want to use this library, do this first:
     
   2.in your app build.gradle add this:
     compile 'com.github.lzzzzzz:rxreglidelibrary:V1.0.1'
+    
+ 同时项目添加Glide图片加载框架及封装工具类
