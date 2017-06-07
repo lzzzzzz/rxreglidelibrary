@@ -10,12 +10,12 @@ v1.0.1版本（目前未完成RxJava1.0->Rxjava2.0的升级）
 if you want to use this library, do this first:
 
   1.in your project root build.gradle add this:
-			allprojects {
+		allprojects {
 			repositories {
-						...
-						maven { url 'https://www.jitpack.io' }
-					}
+					...
+					maven { url 'https://www.jitpack.io' }
 			}
+		}
     
   2.in your app build.gradle add this:
     compile 'com.github.lzzzzzz:rxreglidelibrary:V1.0.1'
